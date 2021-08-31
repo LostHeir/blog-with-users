@@ -1,4 +1,6 @@
-from flask import Flask, render_template, redirect, url_for, flash
+import functools
+
+from flask import Flask, render_template, redirect, url_for, flash, abort
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date
@@ -50,6 +52,17 @@ class BlogUser(UserMixin, db.Model):
     email = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(100), nullable=False)
 # db.create_all()  # Using for creating tables just once.
+
+
+# DECORATORS
+def admin_required(func):
+    @functools.wraps(func)
+    def decorated_function(*args, **kwargs):
+        if current_user.is_anonymous or current_user.id != 1:
+            return abort(403)
+        else:
+            return func(*args, **kwargs)
+    return decorated_function
 
 
 # ROUTS
@@ -125,6 +138,7 @@ def contact():
 
 
 @app.route("/new-post")
+@admin_required
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -143,6 +157,7 @@ def add_new_post():
 
 
 @app.route("/edit-post/<int:post_id>")
+@admin_required
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)
     edit_form = CreatePostForm(
@@ -165,6 +180,7 @@ def edit_post(post_id):
 
 
 @app.route("/delete/<int:post_id>")
+@admin_required
 def delete_post(post_id):
     post_to_delete = BlogPost.query.get(post_id)
     db.session.delete(post_to_delete)
