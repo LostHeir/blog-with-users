@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm, CreateBlogUser, LoginUser
+from forms import CreatePostForm, CreateBlogUser, LoginUser, CreateComment
 from flask_gravatar import Gravatar
 from sqlalchemy.exc import IntegrityError
 
@@ -22,6 +22,16 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# INITIALIZE GRAVATAR
+gravatar = Gravatar(app,
+                    size=100,
+                    rating='X',
+                    # default='404',
+                    force_default=False,
+                    force_lower=False,
+                    use_ssl=False,
+                    base_url=None)
+
 
 # CREATE LOGIN MANAGER
 login_manager = LoginManager()
@@ -34,23 +44,51 @@ def load_user(user_id):
 
 
 # CONFIGURE TABLES
+class BlogUser(UserMixin, db.Model):
+    __tablename__ = "blog_users"
+    id = db.Column(db.Integer, primary_key=True)
+
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    password = db.Column(db.String(100), nullable=False)
+
+    # Create realtion One to Many with BlogPost table
+    posts = relationship("BlogPost", back_populates="author")
+    # Create relation One to Many with PostComment table
+    comments = relationship("PostComment", back_populates="author")
+
+
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
     id = db.Column(db.Integer, primary_key=True)
-    author = db.Column(db.String(250), nullable=False)
+
     title = db.Column(db.String(250), unique=True, nullable=False)
     subtitle = db.Column(db.String(250), nullable=False)
     date = db.Column(db.String(250), nullable=False)
     body = db.Column(db.Text, nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
 
+    # Create relation to BlogUser table
+    author = relationship("BlogUser", back_populates="posts")
+    # Create foreign key to identify author
+    author_id = db.Column(db.Integer, db.ForeignKey("blog_users.id"))
+    # Create realtion One to Many with PostComment table
+    comments = relationship("PostComment", back_populates="post")
 
-class BlogUser(UserMixin, db.Model):
-    __tablename__ = "blog_users"
+
+class PostComment(db.Model):
+    __tablename__ = "comments"
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), nullable=False, unique=True)
-    password = db.Column(db.String(100), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    # Create relation to BlogUser table
+    author = relationship("BlogUser", back_populates="comments")
+    # Create foreign key to identify post author
+    author_id = db.Column(db.Integer, db.ForeignKey("blog_users.id"))
+    # Create relation to BlogPost table
+    post = relationship("BlogPost", back_populates="comments")
+    # Create foreign key to identify post
+    post_id = db.Column(db.Integer, db.ForeignKey("blog_posts.id"))
+
 # db.create_all()  # Using for creating tables just once.
 
 
@@ -121,10 +159,19 @@ def logout():
     return redirect(url_for('get_all_posts'))
 
 
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=["GET", "POST"])
 def show_post(post_id):
     requested_post = BlogPost.query.get(post_id)
-    return render_template("post.html", post=requested_post)
+    form = CreateComment()
+    if form.validate_on_submit() and not current_user.is_anonymous:
+        new_comment = PostComment(text=form.text.data, author=current_user, post=requested_post)
+        db.session.add(new_comment)
+        db.session.commit()
+        render_template("post.html", post=requested_post, form=form)
+    elif form.validate_on_submit():
+        flash("You need to be logged in, to comment posts!")
+        return redirect(url_for("login"))
+    return render_template("post.html", post=requested_post, form=form)
 
 
 @app.route("/about")
@@ -137,7 +184,7 @@ def contact():
     return render_template("contact.html")
 
 
-@app.route("/new-post")
+@app.route("/new-post", methods=["GET", "POST"])
 @admin_required
 def add_new_post():
     form = CreatePostForm()

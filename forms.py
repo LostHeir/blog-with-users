@@ -28,3 +28,8 @@ class LoginUser(FlaskForm):
                                                       Length(min=8, message="Your password should have at least"
                                                                             " %(min)d charactrs")])
     submit = SubmitField("Login")
+
+
+class CreateComment(FlaskForm):
+    text = CKEditorField("Comment", validators=[DataRequired()])
+    submit = SubmitField("Submit")
