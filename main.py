@@ -1,4 +1,5 @@
 import functools
+import os
 
 from flask import Flask, render_template, redirect, url_for, flash, abort
 from flask_bootstrap import Bootstrap
@@ -13,12 +14,12 @@ from flask_gravatar import Gravatar
 from sqlalchemy.exc import IntegrityError
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '!\x13\xff\x01Q\xdfU\x0c\xd5y\xf2H+\xfcm\xf4'  # generated via os.urandom(16)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')  # generated via os.urandom(16)
 ckeditor = CKEditor(app)
 Bootstrap(app)
 
 # CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///blog.db')  # PostgreSQL DB on Heroku, alternatively use sqllite DB for local development
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
