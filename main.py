@@ -90,7 +90,7 @@ class PostComment(db.Model):
     # Create foreign key to identify post
     post_id = db.Column(db.Integer, db.ForeignKey("blog_posts.id"))
 
-# db.create_all()  # Using for creating tables just once.
+db.create_all()  # Using for creating tables just once.
 
 
 # DECORATORS
